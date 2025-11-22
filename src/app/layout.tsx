@@ -3,7 +3,9 @@ import { Providers } from './providers';
 import '~/styles/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Prisma Starter',
+  title: 'Currency Converter - Real-time Exchange Rates',
+  description:
+    'Convert currencies with live exchange rates powered by OpenExchangeRates',
   icons: {
     icon: '/favicon.ico',
   },

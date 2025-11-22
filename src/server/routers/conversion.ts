@@ -6,6 +6,7 @@ import type { Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { prisma } from '~/server/prisma';
+import { convertCurrency } from '~/server/services/converter';
 
 const defaultConversionSelect = {
   id: true,
@@ -81,7 +82,6 @@ export const conversionRouter = router({
       z.object({
         sourceAmount: z.number().int().positive(),
         sourceCurrency: z.string().length(3).toUpperCase(),
-        targetAmount: z.number().int().positive(),
         targetCurrency: z.string().length(3).toUpperCase(),
       }),
     )
@@ -93,8 +93,21 @@ export const conversionRouter = router({
         });
       }
 
+      // Perform currency conversion using external API
+      const conversionResult = await convertCurrency(
+        input.sourceAmount,
+        input.sourceCurrency,
+        input.targetCurrency,
+      );
+
+      // Save conversion to database
       const conversion = await prisma.conversion.create({
-        data: input,
+        data: {
+          sourceAmount: conversionResult.sourceAmount,
+          sourceCurrency: conversionResult.sourceCurrency,
+          targetAmount: conversionResult.targetAmount,
+          targetCurrency: conversionResult.targetCurrency,
+        },
         select: defaultConversionSelect,
       });
 

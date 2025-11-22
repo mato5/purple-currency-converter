@@ -1,5 +1,6 @@
 {
-  "name": "examples-trpc-next-prisma-starter",
+  "name": "currency-converter",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "generate": "prisma generate",
@@ -67,8 +68,10 @@
     "vite": "^6.1.1",
     "vitest": "^3.1.2"
   },
-  "publishConfig": {
-    "access": "restricted"
-  },
-  "version": "11.7.1"
+  "contributors": [
+    {
+      "name": "Matej Sojak",
+      "url": "https://github.com/mato5"
+    }
+  ]
 }

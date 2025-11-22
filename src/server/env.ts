@@ -8,6 +8,7 @@ import { z } from 'zod';
 const envSchema = z.object({
   DATABASE_URL: z.string(),
   NODE_ENV: z.enum(['development', 'test', 'production']),
+  OPENEXCHANGERATES_API_KEY: z.string().min(1),
 });
 
 const _env = envSchema.safeParse(process.env);
