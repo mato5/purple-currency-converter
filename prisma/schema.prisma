@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Conversion {
+  id             String   @id @default(uuid())
+  createdAt      DateTime @default(now()) @map("created_at")
+  sourceAmount   Int      @map("source_amount")
+  sourceCurrency String   @map("source_currency")
+  targetAmount   Int      @map("target_amount")
+  targetCurrency String   @map("target_currency")
+
+  @@map("conversion")
+}
+
+model Statistic {
+  id                          String   @id @default(uuid())
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+  totalConversions            Int      @map("total_conversions")
+  mostConvertedCurrency       String   @map("most_converted_currency")
+  mostConvertedCurrencyAmount Int      @map("most_converted_currency_amount")
+
+  @@map("statistic")
+}
