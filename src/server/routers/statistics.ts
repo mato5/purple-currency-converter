@@ -2,11 +2,13 @@
  * Statistics router for currency conversion analytics
  * Statistics are automatically maintained by database triggers
  */
-import { router, publicProcedure } from '../trpc';
-import { TRPCError } from '@trpc/server';
-import { prisma } from '~/server/prisma';
+import { router, publicProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { prisma } from "~/server/prisma";
+import { getTimeseriesData } from "~/server/services/converter";
 
-const STATS_ID = 'default';
+const STATS_ID = "default";
 
 export const statisticsRouter = router({
   /**
@@ -26,8 +28,8 @@ export const statisticsRouter = router({
 
     if (!stats) {
       throw new TRPCError({
-        code: 'NOT_FOUND',
-        message: 'Statistics not available',
+        code: "NOT_FOUND",
+        message: "Statistics not available",
       });
     }
 
@@ -35,25 +37,42 @@ export const statisticsRouter = router({
   }),
 
   /**
+   * Get timeseries data for a given source and target currency
+   * Shows the exchange rate between the two currencies over time
+   */
+  getTimeseriesData: publicProcedure
+    .input(
+      z.object({
+        sourceCurrency: z.string(),
+        targetCurrency: z.string(),
+        startDate: z.date(),
+        endDate: z.date(),
+      })
+    )
+    .query(async ({ input }) => {
+      return getTimeseriesData(input);
+    }),
+
+  /**
    * Get currency breakdown (aggregated on-demand)
-   * Shows conversion count by currency
+   * Shows conversion count by target currency
    */
   currencyBreakdown: publicProcedure.query(async () => {
     const breakdown = await prisma.conversion.groupBy({
-      by: ['sourceCurrency'],
+      by: ["targetCurrency"],
       _count: {
-        sourceCurrency: true,
+        targetCurrency: true,
       },
       orderBy: {
         _count: {
-          sourceCurrency: 'desc',
+          targetCurrency: "desc",
         },
       },
     });
 
     return breakdown.map((item) => ({
-      currency: item.sourceCurrency,
-      count: item._count.sourceCurrency,
+      currency: item.targetCurrency,
+      count: item._count.targetCurrency,
     }));
   }),
 
@@ -77,14 +96,14 @@ export const statisticsRouter = router({
         sourceCurrency: true,
       },
       orderBy: {
-        createdAt: 'asc',
+        createdAt: "asc",
       },
     });
 
     // Group by date
     const dailyCounts: Record<string, number> = {};
     conversions.forEach((conversion) => {
-      const date = conversion.createdAt.toISOString().split('T')[0];
+      const date = conversion.createdAt.toISOString().split("T")[0];
       dailyCounts[date] = (dailyCounts[date] || 0) + 1;
     });
 
@@ -93,4 +112,29 @@ export const statisticsRouter = router({
       count,
     }));
   }),
+
+  /**
+   * Get historical exchange rate timeseries from ECB
+   * Returns empty array if data is not available for the currency pair
+   */
+  timeseries: publicProcedure
+    .input(
+      z.object({
+        sourceCurrency: z.string().length(3).toUpperCase(),
+        targetCurrency: z.string().length(3).toUpperCase(),
+        days: z.number().int().min(1).max(365).default(30),
+      })
+    )
+    .query(async ({ input }) => {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - input.days);
+
+      return await getTimeseriesData({
+        sourceCurrency: input.sourceCurrency,
+        targetCurrency: input.targetCurrency,
+        startDate,
+        endDate,
+      });
+    }),
 });

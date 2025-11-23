@@ -6,7 +6,10 @@ import type { Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { prisma } from '~/server/prisma';
-import { convertCurrency } from '~/server/services/converter';
+import {
+  convertCurrency,
+  getAvailableCurrencies,
+} from '~/server/services/converter';
 
 const defaultConversionSelect = {
   id: true,
@@ -72,6 +75,13 @@ export const conversionRouter = router({
 
       return conversion;
     }),
+
+  /**
+   * List available currencies
+   */
+  listCurrencies: publicProcedure.query(async () => {
+    return getAvailableCurrencies();
+  }),
 
   /**
    * Create a new conversion

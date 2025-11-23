@@ -29,15 +29,15 @@ SET updated_at = datetime('now'),
         FROM conversion
     ),
     most_converted_currency = (
-        SELECT source_currency
+        SELECT target_currency
         FROM conversion
-        GROUP BY source_currency
+        GROUP BY target_currency
         ORDER BY COUNT(*) DESC
         LIMIT 1
     ), most_converted_currency_amount = (
-        SELECT COUNT(*)
+        SELECT SUM(target_amount)
         FROM conversion
-        GROUP BY source_currency
+        GROUP BY target_currency
         ORDER BY COUNT(*) DESC
         LIMIT 1
     )
@@ -54,17 +54,17 @@ SET updated_at = datetime('now'),
     ),
     most_converted_currency = COALESCE(
         (
-            SELECT source_currency
+            SELECT target_currency
             FROM conversion
-            GROUP BY source_currency
+            GROUP BY target_currency
             ORDER BY COUNT(*) DESC
             LIMIT 1
         ), ''
     ), most_converted_currency_amount = COALESCE(
         (
-            SELECT COUNT(*)
+            SELECT SUM(target_amount)
             FROM conversion
-            GROUP BY source_currency
+            GROUP BY target_currency
             ORDER BY COUNT(*) DESC
             LIMIT 1
         ), 0
