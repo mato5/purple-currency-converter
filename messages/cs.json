@@ -1,0 +1,67 @@
+{
+  "app": {
+    "title": "Fialový převodník měn",
+    "metadata": {
+      "title": "Převodník měn - Směnné kurzy v reálném čase",
+      "description": "Převádějte měny s živými směnnými kurzy"
+    }
+  },
+  "converter": {
+    "amountLabel": "Částka k převodu",
+    "amountPlaceholder": "0",
+    "fromLabel": "Z",
+    "toLabel": "Na",
+    "swapCurrencies": "Prohodit měny",
+    "convertButton": "Převést měnu",
+    "converting": "Převádím...",
+    "result": "Výsledek",
+    "resultPlaceholder": "X",
+    "error": "Převod selhal",
+    "unknownError": "Došlo k neznámé chybě. Zkuste to prosím znovu.",
+    "networkError": "Nelze se připojit k serveru. Zkontrolujte připojení k internetu a zkuste to znovu.",
+    "statistics": {
+      "totalConversions": "Počet provedených výpočtů",
+      "mostConverted": "Nejčastěji převáděná měna",
+      "totalAmount": "Celková částka převedená na {currency}"
+    },
+    "chart": {
+      "title": "{from} na {to} - Trend za {timeframe}",
+      "subtitle": "Historický směnný kurz",
+      "loading": "Načítání grafu...",
+      "loadError": "Nepodařilo se načíst graf",
+      "noData": "Nejsou dostupná žádná data",
+      "noDataMessage": "Historická data nejsou pro tento měnový pár k dispozici.",
+      "timeframes": {
+        "7d": "7 dní",
+        "30d": "30 dní",
+        "90d": "90 dní",
+        "1y": "1 rok"
+      },
+      "buttons": {
+        "7d": "7D",
+        "30d": "30D",
+        "90d": "90D",
+        "1y": "1R"
+      }
+    },
+    "errors": {
+      "currenciesLoadFailed": "Nepodařilo se načíst měny",
+      "conversionFailed": "Převod se nezdařil",
+      "invalidAmount": "Zadejte prosím částku",
+      "invalidNumber": "Zadejte prosím platné číslo",
+      "amountTooLow": "Částka musí být větší než nula",
+      "invalidCurrencyCode": "Neplatný kód měny",
+      "sameCurrency": "Zdrojová a cílová měna musí být odlišné"
+    },
+    "search": {
+      "placeholder": "Hledat měnu...",
+      "noResults": "Nebyly nalezeny žádné měny"
+    }
+  },
+  "locale": {
+    "label": "Jazyk",
+    "en": "English",
+    "cs": "Čeština",
+    "de": "Deutsch"
+  }
+}

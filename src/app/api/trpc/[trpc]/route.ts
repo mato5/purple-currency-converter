@@ -1,6 +1,9 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter } from '~/server/routers/_app';
 import { createContext } from '~/server/context';
+import { createLogger } from '~/server/logger';
+
+const logger = createLogger({ module: 'trpc-handler' });
 
 const handler = (req: Request) =>
   fetchRequestHandler({
@@ -10,8 +13,7 @@ const handler = (req: Request) =>
     createContext: () => createContext(),
     onError({ error }) {
       if (error.code === 'INTERNAL_SERVER_ERROR') {
-        // send to bug reporting
-        console.error('Something went wrong', error);
+        logger.error({ error }, 'Unhandled tRPC error');
       }
     },
   });

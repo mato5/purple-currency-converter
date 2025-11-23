@@ -1,7 +1,12 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { httpBatchStreamLink, loggerLink } from '@trpc/client';
+import { 
+  httpBatchStreamLink, 
+  httpSubscriptionLink,
+  splitLink,
+  loggerLink 
+} from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import { useState } from 'react';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
@@ -28,8 +33,33 @@ function getBaseUrl() {
   return `http://127.0.0.1:${process.env.PORT ?? 3000}`;
 }
 
-export function TRPCProvider({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+export function TRPCProvider({ 
+  children,
+}: { 
+  children: React.ReactNode;
+}) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            // Cache timeseries data for 1 hour (client-side)
+            staleTime: 60 * 60 * 1000,
+            // Keep data in cache for 24 hours
+            gcTime: 24 * 60 * 60 * 1000,
+            // Don't refetch on window focus for cached data
+            refetchOnWindowFocus: false,
+            // Retry failed requests
+            retry: 2,
+          },
+          mutations: {
+            // Don't retry mutations on failure
+            retry: false,
+          },
+        },
+      })
+  );
+
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [
@@ -38,9 +68,45 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
             process.env.NODE_ENV === 'development' ||
             (opts.direction === 'down' && opts.result instanceof Error),
         }),
-        httpBatchStreamLink({
-          url: `${getBaseUrl()}/api/trpc`,
-          transformer,
+        splitLink({
+          // Use httpSubscriptionLink for subscriptions
+          condition: (op) => op.type === 'subscription',
+          true: httpSubscriptionLink({
+            url: `${getBaseUrl()}/api/trpc`,
+            transformer,
+          }),
+          // Use httpBatchStreamLink for queries and mutations
+          false: httpBatchStreamLink({
+            url: `${getBaseUrl()}/api/trpc`,
+            transformer,
+            // Add timeout and better error handling
+            async fetch(url, options) {
+              // Create an AbortController with a 5-second timeout
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000);
+              
+              try {
+                const response = await fetch(url, {
+                  ...options,
+                  signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+                return response;
+              } catch (error) {
+                clearTimeout(timeoutId);
+                // Convert all network errors to a consistent error type
+                if (error instanceof Error) {
+                  if (error.name === 'AbortError') {
+                    throw new TypeError('Network error: Request timeout');
+                  }
+                  if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    throw new TypeError('Network error: Unable to connect');
+                  }
+                }
+                throw error;
+              }
+            },
+          }),
         }),
       ],
     })

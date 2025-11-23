@@ -1,27 +1,9 @@
-import { env } from '../env';
+import { config } from '~/server/config';
+import { createLogger } from '~/server/logger';
+import { cache } from '~/server/cache';
+import currencyCodes from 'currency-codes';
 
-// Cache configuration
-const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
-const CURRENCIES_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const TIMESERIES_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-// In-memory cache for exchange rates
-interface RatesCache {
-  rates: Record<string, number>;
-  timestamp: number;
-}
-
-// In-memory cache for available currencies
-interface CurrenciesCache {
-  currencies: Currency[];
-  timestamp: number;
-}
-
-// In-memory cache for timeseries data (per year per currency)
-interface TimeseriesCache {
-  data: Record<string, number>; // date -> rate
-  timestamp: number;
-}
+const logger = createLogger({ module: 'converter' });
 
 export interface Currency {
   code: string;
@@ -33,58 +15,88 @@ export interface TimeseriesDataPoint {
   rate: number;
 }
 
-let ratesCache: RatesCache | null = null;
-let currenciesCache: CurrenciesCache | null = null;
-// Cache key: "YEAR-CURRENCY" -> TimeseriesCache
-const timeseriesCache = new Map<string, TimeseriesCache>();
+/**
+ * Validate currency code using currency-codes library
+ */
+export function isValidCurrencyCode(code: string): boolean {
+  return currencyCodes.code(code) !== undefined;
+}
 
 /**
  * Fetch exchange rates from OpenExchangeRates API
- * Uses in-memory cache to minimize API calls
+ * Uses filesystem cache to minimize API calls
  */
-const fetchExchangeRates = async (): Promise<Record<string, number>> => {
-  const now = Date.now();
+export async function fetchExchangeRates(): Promise<Record<string, number>> {
+  const cacheKey = 'exchange_rates';
 
-  // Return cached rates if still valid
-  if (ratesCache && now - ratesCache.timestamp < CACHE_TTL) {
-    console.log('Using cached exchange rates');
-    return ratesCache.rates;
+  // Try to get from cache
+  const cached = await cache.get<Record<string, number>>(cacheKey);
+  if (cached) {
+    logger.debug('Using cached exchange rates');
+    return cached;
   }
 
-  console.log('Fetching fresh exchange rates from API');
+  logger.info('Fetching fresh exchange rates from API');
 
-  // Fetch fresh rates from API
-  const response = await fetch(
-    `https://openexchangerates.org/api/latest.json?app_id=${env.OPENEXCHANGERATES_API_KEY}`,
-  );
+  try {
+    const url = `${config.openExchangeRatesBaseUrl}/latest.json?app_id=${config.openExchangeRatesApiKey}`;
+    // Add 10 second timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(
-      `Failed to fetch exchange rates: ${response.status} - ${error}`,
+    const response = await fetch(url, { signal: controller.signal }).finally(
+      () => {
+        clearTimeout(timeoutId);
+      },
     );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(
+        { status: response.status, error },
+        'Failed to fetch exchange rates',
+      );
+      throw new Error(
+        `Failed to fetch exchange rates: ${response.status} - ${error}`,
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.rates) {
+      logger.error('Invalid response from exchange rate API');
+      throw new Error('Invalid response from exchange rate API');
+    }
+
+    // Cache the rates
+    await cache.set(cacheKey, data.rates, config.cache.exchangeRatesTtl);
+
+    return data.rates;
+  } catch (error) {
+    // Check if it's a timeout (AbortError)
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.error({ error }, 'Request timeout while fetching exchange rates');
+      throw new Error(
+        'Network error: Unable to connect to exchange rate service',
+      );
+    }
+    // Check if it's a network error (fetch failed)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      logger.error({ error }, 'Network error while fetching exchange rates');
+      throw new Error(
+        'Network error: Unable to connect to exchange rate service',
+      );
+    }
+    // Re-throw other errors
+    throw error;
   }
-
-  const data = await response.json();
-
-  if (!data.rates) {
-    throw new Error('Invalid response from exchange rate API');
-  }
-
-  // Update cache
-  ratesCache = {
-    rates: data.rates,
-    timestamp: now,
-  };
-
-  return data.rates;
-};
+}
 
 /**
  * Convert currency from source to target
  * Fetches exchange rates with caching mechanism
  */
-export const convertCurrency = async (
+export async function convertCurrency(
   sourceAmount: number,
   sourceCurrency: string,
   targetCurrency: string,
@@ -93,93 +105,166 @@ export const convertCurrency = async (
   targetCurrency: string;
   sourceCurrency: string;
   sourceAmount: number;
-}> => {
+}> {
+  logger.debug(
+    { sourceAmount, sourceCurrency, targetCurrency },
+    'Converting currency',
+  );
+
+  // Validate currency codes
+  if (!isValidCurrencyCode(sourceCurrency)) {
+    logger.warn({ currency: sourceCurrency }, 'Invalid source currency code');
+    throw new Error(`Invalid source currency code: ${sourceCurrency}`);
+  }
+
+  if (!isValidCurrencyCode(targetCurrency)) {
+    logger.warn({ currency: targetCurrency }, 'Invalid target currency code');
+    throw new Error(`Invalid target currency code: ${targetCurrency}`);
+  }
+
   const rates = await fetchExchangeRates();
 
   // Validate currencies exist in rates
   if (!rates[sourceCurrency]) {
+    logger.warn(
+      { currency: sourceCurrency },
+      'Currency not found in exchange rates',
+    );
     throw new Error(`Currency '${sourceCurrency}' not found in exchange rates`);
   }
 
   if (!rates[targetCurrency]) {
+    logger.warn(
+      { currency: targetCurrency },
+      'Currency not found in exchange rates',
+    );
     throw new Error(`Currency '${targetCurrency}' not found in exchange rates`);
   }
 
   // OpenExchangeRates uses USD as base currency
   // Convert: sourceAmount (in cents) -> USD -> targetAmount (in cents)
+  // Note: Using floating-point arithmetic is standard for currency conversion.
+  // Precision is maintained by:
+  // 1. Working in cents (smallest unit)
+  // 2. Rounding only at the final step
+  // 3. Using exchange rates with sufficient decimal places
   const amountInUSD = sourceAmount / rates[sourceCurrency];
   const targetAmount = amountInUSD * rates[targetCurrency];
+
+  // Round to nearest cent using standard rounding (rounds 0.5 up)
+  // This is the industry-standard approach for currency conversion
+  const roundedTargetAmount = Math.round(targetAmount);
+
+  logger.debug(
+    {
+      sourceAmount,
+      targetAmount: roundedTargetAmount,
+      sourceCurrency,
+      targetCurrency,
+      precision: targetAmount - roundedTargetAmount, // Log precision difference
+    },
+    'Currency converted successfully',
+  );
 
   return {
     sourceAmount,
     sourceCurrency,
-    targetAmount: Math.round(targetAmount), // Round to nearest integer (cents)
+    targetAmount: roundedTargetAmount,
     targetCurrency,
   };
-};
+}
 
 /**
  * Get available currencies from OpenExchangeRates API
- * Uses in-memory cache with 24-hour TTL
+ * Uses filesystem cache with 24-hour TTL
  */
-export const getAvailableCurrencies = async (): Promise<Currency[]> => {
-  const now = Date.now();
+export async function getAvailableCurrencies(): Promise<Currency[]> {
+  const cacheKey = 'available_currencies';
 
-  // Return cached currencies if still valid
-  if (
-    currenciesCache &&
-    now - currenciesCache.timestamp < CURRENCIES_CACHE_TTL
-  ) {
-    console.log('Using cached currencies list');
-    return currenciesCache.currencies;
+  // Try to get from cache
+  const cached = await cache.get<Currency[]>(cacheKey);
+  if (cached) {
+    logger.debug('Using cached currencies list');
+    return cached;
   }
 
-  console.log('Fetching fresh currencies list from API');
+  logger.info('Fetching fresh currencies list from API');
 
-  const response = await fetch(
-    `https://openexchangerates.org/api/currencies.json?app_id=${env.OPENEXCHANGERATES_API_KEY}`,
-  );
+  try {
+    const url = `${config.openExchangeRatesBaseUrl}/currencies.json?app_id=${config.openExchangeRatesApiKey}`;
+    // Add 10 second timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(
-      `Failed to fetch available currencies: ${response.status} - ${error}`,
+    const response = await fetch(url, { signal: controller.signal }).finally(
+      () => {
+        clearTimeout(timeoutId);
+      },
     );
+
+    if (!response.ok) {
+      const error = await response.text();
+      logger.error(
+        { status: response.status, error },
+        'Failed to fetch available currencies',
+      );
+      throw new Error(
+        `Failed to fetch available currencies: ${response.status} - ${error}`,
+      );
+    }
+
+    const data = await response.json();
+
+    const currencies: Currency[] = Object.entries(data)
+      .map(([code, name]) => ({
+        code,
+        name: name as string,
+      }))
+      .filter((currency) => isValidCurrencyCode(currency.code));
+
+    // Cache the currencies
+    await cache.set(cacheKey, currencies, config.cache.currenciesTtl);
+
+    logger.debug(
+      { count: currencies.length },
+      'Currencies fetched successfully',
+    );
+
+    return currencies;
+  } catch (error) {
+    // Check if it's a timeout (AbortError)
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.error({ error }, 'Request timeout while fetching currencies');
+      throw new Error('Network error: Unable to connect to currency service');
+    }
+    // Check if it's a network error (fetch failed)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      logger.error({ error }, 'Network error while fetching currencies');
+      throw new Error('Network error: Unable to connect to currency service');
+    }
+    // Re-throw other errors
+    throw error;
   }
-
-  const data = await response.json();
-
-  // Update cache
-  currenciesCache = {
-    currencies: Object.entries(data).map(([code, name]) => ({
-      code,
-      name: name as string,
-    })),
-    timestamp: now,
-  };
-
-  return currenciesCache.currencies;
-};
+}
 
 /**
  * Fetch ECB timeseries data for a specific currency and year
  * ECB provides rates with EUR as base currency
  */
-const fetchECBTimeseries = async (
+async function fetchECBTimeseries(
   currency: string,
   year: number,
-): Promise<Record<string, number>> => {
-  const cacheKey = `${year}-${currency}`;
-  const now = Date.now();
+): Promise<Record<string, number>> {
+  const cacheKey = `timeseries_${year}_${currency}`;
 
-  // Check cache
-  const cached = timeseriesCache.get(cacheKey);
-  if (cached && now - cached.timestamp < TIMESERIES_CACHE_TTL) {
-    console.log(`Using cached timeseries for ${cacheKey}`);
-    return cached.data;
+  // Try to get from cache
+  const cached = await cache.get<Record<string, number>>(cacheKey);
+  if (cached) {
+    logger.debug({ currency, year }, 'Using cached timeseries');
+    return cached;
   }
 
-  console.log(`Fetching ECB timeseries for ${cacheKey}`);
+  logger.info({ currency, year }, 'Fetching ECB timeseries');
 
   // Special case: EUR to EUR is always 1
   if (currency === 'EUR') {
@@ -196,33 +281,33 @@ const fetchECBTimeseries = async (
       data[dateStr] = 1.0;
     }
 
-    timeseriesCache.set(cacheKey, {
-      data,
-      timestamp: now,
-    });
-
+    await cache.set(cacheKey, data, config.cache.timeseriesTtl);
     return data;
   }
 
   // Fetch from ECB API
   const startPeriod = `${year}-01-01`;
   const endPeriod = `${year}-12-31`;
-  const url = `https://data-api.ecb.europa.eu/service/data/EXR/D.${currency}.EUR.SP00.A?startPeriod=${startPeriod}&endPeriod=${endPeriod}&format=csvdata`;
+  const url = `${config.ecbBaseUrl}/D.${currency}.EUR.SP00.A?startPeriod=${startPeriod}&endPeriod=${endPeriod}&format=csvdata`;
 
-  const response = await fetch(url);
+  // Add 10 second timeout to prevent hanging
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  // If currency not supported or not found, return empty data
+  const response = await fetch(url, { signal: controller.signal }).finally(
+    () => {
+      clearTimeout(timeoutId);
+    },
+  );
+
   if (!response.ok) {
-    console.log(
-      `Currency '${currency}' not supported by ECB or request failed: ${response.status}`,
+    logger.warn(
+      { currency, year, status: response.status },
+      'Currency not supported by ECB or request failed',
     );
-    const emptyData = {};
-    // Cache the empty result to avoid repeated API calls
-    timeseriesCache.set(cacheKey, {
-      data: emptyData,
-      timestamp: now,
-    });
-    return emptyData;
+    // Cache empty result
+    await cache.set(cacheKey, {}, config.cache.timeseriesTtl);
+    return {};
   }
 
   const csvText = await response.text();
@@ -250,20 +335,22 @@ const fetchECBTimeseries = async (
     }
   }
 
-  // Cache the data (even if empty)
-  timeseriesCache.set(cacheKey, {
-    data,
-    timestamp: now,
-  });
+  // Cache the data
+  await cache.set(cacheKey, data, config.cache.timeseriesTtl);
+
+  logger.debug(
+    { currency, year, dataPoints: Object.keys(data).length },
+    'Timeseries fetched successfully',
+  );
 
   return data;
-};
+}
 
 /**
  * Get timeseries exchange rate data from ECB
  * Fetches data for the entire year(s), caches it, and returns filtered results
  */
-export const getTimeseriesData = async ({
+export async function getTimeseriesData({
   sourceCurrency,
   targetCurrency,
   startDate,
@@ -273,7 +360,12 @@ export const getTimeseriesData = async ({
   targetCurrency: string;
   startDate: Date;
   endDate: Date;
-}): Promise<TimeseriesDataPoint[]> => {
+}): Promise<TimeseriesDataPoint[]> {
+  logger.debug(
+    { sourceCurrency, targetCurrency, startDate, endDate },
+    'Getting timeseries data',
+  );
+
   // Determine which years we need to fetch
   const startYear = startDate.getFullYear();
   const endYear = endDate.getFullYear();
@@ -299,11 +391,11 @@ export const getTimeseriesData = async ({
   const allSourceData: Record<string, number> = {};
   const allTargetData: Record<string, number> = {};
 
-  for (const [_year, data] of sourceDataByYear) {
+  for (const [, data] of sourceDataByYear) {
     Object.assign(allSourceData, data);
   }
 
-  for (const [_year, data] of targetDataByYear) {
+  for (const [, data] of targetDataByYear) {
     Object.assign(allTargetData, data);
   }
 
@@ -334,6 +426,10 @@ export const getTimeseriesData = async ({
     }
   }
 
-  // Return empty array if no data available (currency not supported or no data for date range)
+  logger.debug(
+    { sourceCurrency, targetCurrency, dataPoints: result.length },
+    'Timeseries data retrieved successfully',
+  );
+
   return result;
-};
+}

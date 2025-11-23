@@ -1,0 +1,67 @@
+{
+  "app": {
+    "title": "Lila Währungsrechner",
+    "metadata": {
+      "title": "Währungsrechner - Echtzeit-Wechselkurse",
+      "description": "Währungen mit Live-Wechselkursen umrechnen"
+    }
+  },
+  "converter": {
+    "amountLabel": "Umzurechnender Betrag",
+    "amountPlaceholder": "0",
+    "fromLabel": "Von",
+    "toLabel": "Nach",
+    "swapCurrencies": "Währungen tauschen",
+    "convertButton": "Währung umrechnen",
+    "converting": "Wird umgerechnet...",
+    "result": "Ergebnis",
+    "resultPlaceholder": "X",
+    "error": "Umrechnung fehlgeschlagen",
+    "unknownError": "Ein unbekannter Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    "networkError": "Verbindung zum Server nicht möglich. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.",
+    "statistics": {
+      "totalConversions": "Anzahl der durchgeführten Berechnungen",
+      "mostConverted": "Am häufigsten umgerechnete Währung",
+      "totalAmount": "Gesamtbetrag umgerechnet in {currency}"
+    },
+    "chart": {
+      "title": "{from} zu {to} - {timeframe} Trend",
+      "subtitle": "Historischer Wechselkurs",
+      "loading": "Diagramm wird geladen...",
+      "loadError": "Fehler beim Laden des Diagramms",
+      "noData": "Keine Daten verfügbar",
+      "noDataMessage": "Für dieses Währungspaar sind keine historischen Daten verfügbar.",
+      "timeframes": {
+        "7d": "7 Tage",
+        "30d": "30 Tage",
+        "90d": "90 Tage",
+        "1y": "1 Jahr"
+      },
+      "buttons": {
+        "7d": "7T",
+        "30d": "30T",
+        "90d": "90T",
+        "1y": "1J"
+      }
+    },
+    "errors": {
+      "currenciesLoadFailed": "Währungen konnten nicht geladen werden",
+      "conversionFailed": "Umrechnung fehlgeschlagen",
+      "invalidAmount": "Bitte geben Sie einen Betrag ein",
+      "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
+      "amountTooLow": "Der Betrag muss größer als Null sein",
+      "invalidCurrencyCode": "Ungültiger Währungscode",
+      "sameCurrency": "Quell- und Zielwährung müssen unterschiedlich sein"
+    },
+    "search": {
+      "placeholder": "Währung suchen...",
+      "noResults": "Keine Währungen gefunden"
+    }
+  },
+  "locale": {
+    "label": "Sprache",
+    "en": "English",
+    "cs": "Čeština",
+    "de": "Deutsch"
+  }
+}

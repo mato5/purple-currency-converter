@@ -1,0 +1,67 @@
+{
+  "app": {
+    "title": "Purple currency converter",
+    "metadata": {
+      "title": "Currency Converter - Real-time Exchange Rates",
+      "description": "Convert currencies with live exchange rates"
+    }
+  },
+  "converter": {
+    "amountLabel": "Amount to convert",
+    "amountPlaceholder": "0",
+    "fromLabel": "From",
+    "toLabel": "To",
+    "swapCurrencies": "Swap currencies",
+    "convertButton": "Convert currency",
+    "converting": "Converting...",
+    "result": "Result",
+    "resultPlaceholder": "X",
+    "error": "Conversion Failed",
+    "unknownError": "An unknown error occurred. Please try again.",
+    "networkError": "Unable to connect to the server. Please check your internet connection and try again.",
+    "statistics": {
+      "totalConversions": "Number of calculations made",
+      "mostConverted": "Most converted currency",
+      "totalAmount": "Total amount converted to {currency}"
+    },
+    "chart": {
+      "title": "{from} to {to} - {timeframe} Trend",
+      "subtitle": "Historical exchange rate",
+      "loading": "Loading chart data...",
+      "loadError": "Failed to load chart data",
+      "noData": "No data available",
+      "noDataMessage": "Historical data is not available for this currency pair.",
+      "timeframes": {
+        "7d": "7 Days",
+        "30d": "30 Days",
+        "90d": "90 Days",
+        "1y": "1 Year"
+      },
+      "buttons": {
+        "7d": "7D",
+        "30d": "30D",
+        "90d": "90D",
+        "1y": "1Y"
+      }
+    },
+    "errors": {
+      "currenciesLoadFailed": "Failed to load currencies",
+      "conversionFailed": "Conversion failed",
+      "invalidAmount": "Please enter an amount",
+      "invalidNumber": "Please enter a valid number",
+      "amountTooLow": "Amount must be greater than zero",
+      "invalidCurrencyCode": "Invalid currency code",
+      "sameCurrency": "Source and target currencies must be different"
+    },
+    "search": {
+      "placeholder": "Search currency...",
+      "noResults": "No currencies found"
+    }
+  },
+  "locale": {
+    "label": "Language",
+    "en": "English",
+    "cs": "Čeština",
+    "de": "Deutsch"
+  }
+}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations, useFormatter } from "next-intl"
 import { Card } from "~/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { trpc } from "~/utils/trpc-client"
@@ -14,6 +15,8 @@ interface CurrencyChartProps {
 type TimeFrame = "7" | "30" | "90" | "365"
 
 export function CurrencyChart({ fromCurrency, toCurrency }: CurrencyChartProps) {
+  const t = useTranslations()
+  const format = useFormatter()
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("30")
 
   // Fetch timeseries data
@@ -43,29 +46,23 @@ export function CurrencyChart({ fromCurrency, toCurrency }: CurrencyChartProps) 
     return aggregated
   }
 
-  // Format date for display
-  const formatDateForChart = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  }
-
-  // Prepare chart data
+  // Prepare chart data with locale-aware date formatting
   const chartData =
     timeseriesQuery.data?.map((point: { date: string; rate: number }) => ({
-      date: formatDateForChart(point.date),
+      date: format.dateTime(new Date(point.date), { month: 'short', day: 'numeric' }),
       rate: point.rate,
-    })) || []
+    })) ?? []
 
   const data = aggregateData(chartData, timeFrame)
 
   const getTimeFrameLabel = () => {
-    const labels = {
-      "7": "7 Days",
-      "30": "30 Days",
-      "90": "90 Days",
-      "365": "1 Year",
+    const labelKeys: Record<TimeFrame, string> = {
+      "7": "converter.chart.timeframes.7d",
+      "30": "converter.chart.timeframes.30d",
+      "90": "converter.chart.timeframes.90d",
+      "365": "converter.chart.timeframes.1y",
     }
-    return labels[timeFrame]
+    return t(labelKeys[timeFrame])
   }
 
   // Calculate Y-axis domain to show fluctuations better
@@ -82,82 +79,99 @@ export function CurrencyChart({ fromCurrency, toCurrency }: CurrencyChartProps) 
   }
 
   return (
-    <Card className="w-full bg-white border border-slate-200 p-6 rounded-xl">
-      <div className="mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+    <Card className="w-full bg-white border border-slate-200 p-4 sm:p-6 rounded-xl">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col gap-3 sm:gap-4 mb-4">
           <div>
-            <h2 className="text-lg md:text-xl font-bold text-slate-900">
-              {fromCurrency} to {toCurrency} - {getTimeFrameLabel()} Trend
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-900">
+              {t('converter.chart.title', { from: fromCurrency, to: toCurrency, timeframe: getTimeFrameLabel() })}
             </h2>
-            <p className="text-sm text-slate-600">Historical exchange rate</p>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1">{t('converter.chart.subtitle')}</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {(["7", "30", "90", "365"] as TimeFrame[]).map((period) => (
-              <button
-                key={period}
-                onClick={() => setTimeFrame(period)}
-                disabled={timeseriesQuery.isLoading}
-                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                  timeFrame === period ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {period === "7" ? "7D" : period === "30" ? "30D" : period === "90" ? "90D" : "1Y"}
-              </button>
-            ))}
+          <div className="grid grid-cols-4 gap-2">
+            {(["7", "30", "90", "365"] as TimeFrame[]).map((period) => {
+              const buttonKeys: Record<TimeFrame, string> = {
+                "7": "converter.chart.buttons.7d",
+                "30": "converter.chart.buttons.30d",
+                "90": "converter.chart.buttons.90d",
+                "365": "converter.chart.buttons.1y",
+              }
+              return (
+                <button
+                  key={period}
+                  onClick={() => setTimeFrame(period)}
+                  disabled={timeseriesQuery.isLoading}
+                  className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    timeFrame === period ? "bg-purple-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {t(buttonKeys[period])}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
-      <div className="h-80 w-full">
+      <div className="h-64 sm:h-80 w-full">
         {timeseriesQuery.isLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
-              <p className="text-sm text-slate-600">Loading chart data...</p>
+              <p className="text-sm text-slate-600">{t('converter.chart.loading')}</p>
             </div>
           </div>
         ) : timeseriesQuery.error ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-red-500">
-              <p className="font-semibold">Failed to load chart data</p>
+              <p className="font-semibold">{t('converter.chart.loadError')}</p>
               <p className="text-sm text-slate-600 mt-1">{timeseriesQuery.error.message}</p>
             </div>
           </div>
         ) : data.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-slate-600">
-              <p className="font-semibold text-lg">No data available</p>
+              <p className="font-semibold text-lg">{t('converter.chart.noData')}</p>
               <p className="text-sm mt-2">
-                Historical data is not available for this currency pair.
+                {t('converter.chart.noDataMessage')}
               </p>
             </div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="date" stroke="#64748b" style={{ fontSize: "12px" }} />
+              <XAxis 
+                dataKey="date" 
+                stroke="#64748b" 
+                style={{ fontSize: "10px" }} 
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
               <YAxis 
                 stroke="#64748b" 
-                style={{ fontSize: "12px" }} 
+                style={{ fontSize: "10px" }} 
                 domain={getYAxisDomain()}
                 tickFormatter={(value: number) => value.toFixed(4)}
+                width={60}
               />
               <Tooltip
                 contentStyle={{
                   backgroundColor: "#ffffff",
                   border: "1px solid #e2e8f0",
                   borderRadius: "8px",
+                  fontSize: "12px",
                 }}
                 formatter={(value: number) => value.toFixed(4)}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: "12px" }} />
               <Line
                 type="monotone"
                 dataKey="rate"
                 stroke="#a855f7"
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 6 }}
+                activeDot={{ r: 4 }}
                 name={`${fromCurrency}/${toCurrency}`}
                 isAnimationActive={true}
               />
