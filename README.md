@@ -37,8 +37,8 @@ Convert between 170+ world currencies with interactive charts and live statistic
 
 ```bash
 # Clone and install
-git clone <repository-url>
-cd currency-converter
+git clone https://github.com/mato5/purple-currency-converter.git
+cd purple-currency-converter
 pnpm install
 
 # Setup environment
@@ -255,7 +255,7 @@ Contributions welcome! Please:
 3. Run `pnpm test-start && pnpm lint-fix && pnpm typecheck`
 4. Submit a PR with clear description
 
-For bugs/features, check existing [Issues](https://github.com/your-repo/issues) first.
+For bugs/features, check existing [Issues](https://github.com/mato5/purple-currency-converter/issues) first.
 
 ## 📄 License
 
