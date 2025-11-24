@@ -71,4 +71,3 @@ export function toTRPCError(error: unknown, defaultMessage: string): TRPCError {
     cause: error,
   });
 }
-

@@ -57,12 +57,13 @@ export const addConversionProcedure = publicProcedure
       );
 
       // Save conversion to database
+      // Convert numbers to strings for storage to prevent overflow
       // SQLite triggers run synchronously within the transaction
       const conversion = await prisma.conversion.create({
         data: {
-          sourceAmount: conversionResult.sourceAmount,
+          sourceAmount: conversionResult.sourceAmount.toString(),
           sourceCurrency: conversionResult.sourceCurrency,
-          targetAmount: conversionResult.targetAmount,
+          targetAmount: conversionResult.targetAmount.toString(),
           targetCurrency: conversionResult.targetCurrency,
         },
         select: defaultConversionSelect,

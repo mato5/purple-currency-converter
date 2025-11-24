@@ -4,18 +4,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowRightLeft, Loader2 } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 
 import { useLocale } from '~/app/providers';
 import { Button } from '~/components/ui/button';
 import { Card } from '~/components/ui/card';
-import { Input } from '~/components/ui/input';
 import { parseAmountToCents } from '~/lib/currency-utils';
 import { createConversionFormSchema } from '~/lib/validation';
 import { trpc } from '~/utils/trpc-client';
 
 import { CurrencyChart } from './currency-chart';
 import { CurrencySelector } from './currency-selector';
+import { FormattedNumberInput } from './formatted-number-input';
 import { LocaleSelector } from './locale-selector';
 
 export function CurrencyConverterCard() {
@@ -36,7 +36,7 @@ export function CurrencyConverterCard() {
 
   // React Hook Form with Zod validation
   const {
-    register,
+    control,
     watch,
     setValue,
     formState: { errors },
@@ -199,14 +199,19 @@ export function CurrencyConverterCard() {
             <label className="block text-sm font-medium text-white mb-2">
               {t('converter.amountLabel')}
             </label>
-            <Input
-              type="text"
-              {...register('amount')}
-              className={`w-full bg-white text-slate-900 border border-white rounded-lg px-3 sm:px-4 py-2.5 text-base font-medium h-[42px] ${
-                errors.amount ? 'ring-2 ring-red-400' : ''
-              }`}
-              placeholder={t('converter.amountPlaceholder')}
-              disabled={convertMutation.isPending}
+            <Controller
+              name="amount"
+              control={control}
+              render={({ field }) => (
+                <FormattedNumberInput
+                  {...field}
+                  className={`w-full bg-white text-slate-900 border border-white rounded-lg px-3 sm:px-4 py-2.5 text-base font-medium h-[42px] ${
+                    errors.amount ? 'ring-2 ring-red-400' : ''
+                  }`}
+                  placeholder={t('converter.amountPlaceholder')}
+                  disabled={convertMutation.isPending}
+                />
+              )}
             />
             {errors.amount && (
               <p className="mt-2 text-sm text-red-200 flex items-center gap-1">
@@ -223,14 +228,19 @@ export function CurrencyConverterCard() {
               <label className="block text-sm font-medium text-white mb-2">
                 {t('converter.amountLabel')}
               </label>
-              <Input
-                type="text"
-                {...register('amount')}
-                className={`w-full bg-white text-slate-900 border border-white rounded-lg px-3 sm:px-4 py-2.5 text-base font-medium h-[42px] ${
-                  errors.amount ? 'ring-2 ring-red-400' : ''
-                }`}
-                placeholder={t('converter.amountPlaceholder')}
-                disabled={convertMutation.isPending}
+              <Controller
+                name="amount"
+                control={control}
+                render={({ field }) => (
+                  <FormattedNumberInput
+                    {...field}
+                    className={`w-full bg-white text-slate-900 border border-white rounded-lg px-3 sm:px-4 py-2.5 text-base font-medium h-[42px] ${
+                      errors.amount ? 'ring-2 ring-red-400' : ''
+                    }`}
+                    placeholder={t('converter.amountPlaceholder')}
+                    disabled={convertMutation.isPending}
+                  />
+                )}
               />
               {errors.amount && (
                 <p className="mt-2 text-sm text-red-200 flex items-center gap-1">

@@ -10,6 +10,10 @@ const configSchema = z.object({
 
   // Database
   databaseUrl: z.string().min(1),
+  database: z.object({
+    // ID for the singleton statistic row in the database
+    statisticSingletonId: z.string().default('singleton'),
+  }),
 
   // External APIs
   openExchangeRatesApiKey: z.string().min(1),
@@ -72,6 +76,9 @@ export function loadConfig(): Config {
   const raw = {
     nodeEnv: process.env.NODE_ENV,
     databaseUrl: process.env.DATABASE_URL,
+    database: {
+      statisticSingletonId: process.env.STATISTIC_SINGLETON_ID,
+    },
     openExchangeRatesApiKey: process.env.OPENEXCHANGERATES_API_KEY,
     openExchangeRatesBaseUrl: process.env.OPEN_EXCHANGE_RATES_BASE_URL,
     ecbBaseUrl: process.env.ECB_BASE_URL,

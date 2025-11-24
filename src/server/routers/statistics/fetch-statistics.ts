@@ -1,67 +1,51 @@
 /**
- * Calculate statistics on-demand from conversions table
- * With proper indexes, this is fast even with large datasets
- * Much more efficient than triggers that run full scans on every insert
+ * Fetch pre-calculated statistics from the statistic table
+ * Statistics are automatically maintained by database triggers
+ * Much faster than on-demand calculation for large datasets
  */
-import { Prisma } from '@prisma/client';
-
+import { config } from '~/server/config';
 import { createLogger } from '~/server/logger';
 import { prisma } from '~/server/prisma';
 
 const logger = createLogger({ module: 'fetch-statistics' });
 
-/**
- * Type for raw SQL query result
- */
-type MostConvertedCurrencyRow = {
-  targetCurrency: string;
-  count: bigint;
-  total: number; // REAL from SQLite (floating-point)
-};
-
 export async function fetchStatistics() {
-  // Get total count and most converted currency in a single optimized query
-  const [totalConversions, mostConvertedRaw] = await Promise.all([
-    // Fast count using index
-    prisma.conversion.count(),
+  // Fetch the singleton statistic row
+  // This is maintained by triggers and always up-to-date
+  const statistic = await prisma.statistic.findUnique({
+    where: { id: config.database.statisticSingletonId },
+  });
 
-    // Use raw SQL with CAST to REAL for large sum aggregation
-    // This prevents integer overflow by using floating-point arithmetic
-    // IMPORTANT: Cast BEFORE summing to avoid BigInt overflow
-    // Can handle sums up to ~10^308 (vs BigInt's 2^63-1 = ~10^18)
-    prisma.$queryRaw<MostConvertedCurrencyRow[]>(
-      Prisma.sql`
-        SELECT 
-          target_currency as targetCurrency,
-          COUNT(*) as count,
-          SUM(CAST(target_amount as REAL)) as total
-        FROM conversion
-        GROUP BY target_currency
-        ORDER BY count DESC
-        LIMIT 1
-      `,
-    ),
-  ]);
+  // If no statistics exist yet, return defaults
+  if (!statistic) {
+    logger.warn('No statistics found, returning defaults');
+    return {
+      totalConversions: 0,
+      mostConvertedCurrency: '',
+      mostConvertedCurrencyAmount: 0,
+      updatedAt: new Date(),
+    };
+  }
 
-  const mostConvertedCurrency = mostConvertedRaw[0]?.targetCurrency ?? '';
-  // Round back to integer for display (acceptable precision loss at extreme values)
-  const mostConvertedCurrencyAmount = mostConvertedRaw[0]?.total
-    ? Math.round(mostConvertedRaw[0].total)
-    : 0;
+  // Convert stored values to appropriate types
+  const totalConversions = Number(statistic.totalConversions);
+  const mostConvertedCurrencyAmount = Number(
+    statistic.mostConvertedCurrencyAmount,
+  );
 
   logger.debug(
     {
       totalConversions,
-      mostConvertedCurrency,
+      mostConvertedCurrency: statistic.mostConvertedCurrency,
       mostConvertedCurrencyAmount,
     },
-    'Calculated statistics',
+    'Fetched statistics from database',
   );
 
   return {
     totalConversions,
-    mostConvertedCurrency,
+    mostConvertedCurrency: statistic.mostConvertedCurrency,
     mostConvertedCurrencyAmount,
-    updatedAt: new Date(), // Always current
+    updatedAt: statistic.createdAt,
   };
 }

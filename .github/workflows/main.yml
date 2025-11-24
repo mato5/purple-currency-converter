@@ -1,20 +1,34 @@
-name: Testing
-on: [push]
+name: CI
+on: [push, pull_request]
 jobs:
+  lint:
+    name: "Lint & Format Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8.5.1
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 22.x
+          cache: "pnpm"
+
+      - name: Install deps
+        run: pnpm install
+
+      - name: Run ESLint
+        run: pnpm lint
+
   e2e:
-    name: 'Build + E2E tests'
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_DATABASE: trpcdb
-          POSTGRES_USER: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
+    name: "Build + E2E tests"
     env:
       NODE_ENV: test
-      NEXTAUTH_SECRET: supersecret
+      DATABASE_URL: "file:./prisma/dev.db"
+      OPENEXCHANGERATES_API_KEY: ${{ secrets.OPENEXCHANGERATES_API_KEY }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -29,7 +43,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 22.x
-          cache: 'pnpm' # You can active this cache when your repo has a lockfile
+          cache: "pnpm"
 
       - name: Install deps (with cache)
         run: pnpm install
@@ -43,11 +57,16 @@ jobs:
           path: ${{ github.workspace }}/.next/cache
           key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-nextjs
 
-      - name: Setup Prisma
-        run: pnpm prebuild
+      - name: Setup database
+        run: |
+          pnpm prebuild
+          pnpm prisma db push
 
-      - run: pnpm build
-      - run: pnpm test-e2e
+      - name: Build
+        run: pnpm build
+
+      - name: Run E2E tests
+        run: pnpm test-e2e
 
       - name: Check types
         run: pnpm tsc
@@ -56,24 +75,16 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: test results
+          name: test-results
           path: |
             playwright/test-results
 
   unit:
-    name: 'Unit tests + typecheck'
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_DATABASE: trpcdb
-          POSTGRES_USER: postgres
-          POSTGRES_HOST_AUTH_METHOD: trust
-        ports:
-          - 5432:5432
+    name: "Unit tests + typecheck"
     env:
       NODE_ENV: test
-      NEXTAUTH_SECRET: supersecret
+      DATABASE_URL: "file:./prisma/dev.db"
+      OPENEXCHANGERATES_API_KEY: ${{ secrets.OPENEXCHANGERATES_API_KEY }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -88,7 +99,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 22.x
-          cache: 'pnpm' # You can active this cache when your repo has a lockfile
+          cache: "pnpm"
 
       - name: Install deps (with cache)
         run: pnpm install
@@ -99,8 +110,13 @@ jobs:
           path: ${{ github.workspace }}/.next/cache
           key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}-nextjs
 
-      - name: Setup Prisma
-        run: pnpm prebuild
+      - name: Setup database
+        run: |
+          pnpm prebuild
+          pnpm prisma db push
 
-      - run: pnpm test-unit
-      - run: pnpm tsc
+      - name: Run unit tests
+        run: pnpm test-unit
+
+      - name: Check types
+        run: pnpm tsc
