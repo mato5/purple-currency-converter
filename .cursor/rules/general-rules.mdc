@@ -1,0 +1,342 @@
+---
+alwaysApply: true
+---
+
+# Cursor Rules for Currency Converter Application
+
+## Project Context
+You are working on a production-ready currency converter application built with:
+- **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS
+- **Backend**: tRPC, Prisma ORM, SQLite database
+- **Testing**: Playwright (E2E), Vitest (unit tests)
+- **I18n**: next-intl (en, cs, de locales)
+- **Domain**: Real-time currency conversion with historical data visualization
+
+## Core Principles
+
+### 1. Type Safety First
+- Always use TypeScript with strict mode enabled
+- Prefer explicit types over `any` - use `unknown` if truly needed
+- Use Zod schemas for runtime validation at API boundaries
+- Leverage tRPC for end-to-end type safety between client and server
+- Use Prisma types for database queries (`Prisma.ConversionSelect`, etc.)
+
+### 2. Server vs Client Components
+- Default to React Server Components unless client interactivity is needed
+- Use `'use client'` directive only when necessary (hooks, event handlers, browser APIs)
+- Keep server-side logic in `/src/server/` directory
+- Never import server code (`~/server/*`) in client components
+- Use tRPC for client-server communication, not direct imports
+
+### 3. Code Organization
+
+#### File Structure
+```
+src/
+├── app/              # Next.js App Router pages
+├── components/       # React components (with 'use client' if needed)
+├── lib/             # Shared utilities, validation schemas
+├── server/          # Server-only code (tRPC routers, services, DB)
+│   ├── routers/     # tRPC routers (modular, one procedure per file)
+│   ├── services/    # Business logic (currency conversion, etc.)
+│   └── utils/       # Server utilities
+└── utils/           # Client utilities
+```
+
+#### Naming Conventions
+- Components: `PascalCase` (e.g., `CurrencySelector.tsx`)
+- Utilities: `kebab-case` (e.g., `currency-utils.ts`)
+- Procedures: `kebab-case.procedure.ts` (e.g., `add-conversion.procedure.ts`)
+- Tests: `*.test.ts` for unit tests, `*.spec.ts` avoided
+- E2E tests: `playwright/*.test.ts`
+
+### 4. tRPC Best Practices
+
+#### Router Structure
+- Keep routers modular - one procedure per file
+- Export procedures from individual files, compose in `router.ts`
+- Use `publicProcedure` for all endpoints (no auth in this app)
+- Always use Zod schemas from `~/lib/validation` for input validation
+
+#### Example Structure
+```typescript
+// routers/conversion/add-conversion.procedure.ts
+export const addConversionProcedure = publicProcedure
+  .input(conversionInputSchema)
+  .mutation(async ({ input }) => {
+    // Implementation
+  });
+
+// routers/conversion/router.ts
+export const conversionRouter = router({
+  add: addConversionProcedure,
+  list: listCurrenciesProcedure,
+});
+```
+
+#### Error Handling
+- Use custom error handler in `~/server/utils/error-handler.ts`
+- Throw descriptive errors: `throw new Error('Currency not found: USD')`
+- Handle network errors explicitly (timeout, fetch failures)
+- Log errors with structured logging (Pino)
+
+### 5. Database Patterns
+
+#### Prisma Usage
+- Use `prisma.*.findUnique` when searching by ID or unique fields
+- Use `prisma.*.findFirst` for single results with complex queries
+- Always use `select` to limit returned fields (avoid fetching unnecessary data)
+- For type-safe selects, define satisfies patterns:
+  ```typescript
+  const select = {
+    id: true,
+    amount: true,
+  } satisfies Prisma.ConversionSelect;
+  ```
+
+#### Amount Storage
+- Amounts are stored as **strings** in the database (to prevent overflow)
+- Amounts are **numbers** in application logic (cents, within safe integer range)
+- Convert at DB boundary: `amount.toString()` when writing, `Number(amount)` when reading
+- SQL arithmetic uses `CAST(amount AS REAL)` to handle large numbers
+
+#### Statistics Pattern
+- Statistics are pre-calculated by SQLite triggers (see migration)
+- Read from singleton `statistic` row with ID from `config.database.statisticSingletonId`
+- Never manually update statistics - triggers handle it automatically
+
+### 6. Currency Conversion Domain
+
+#### Amount Handling
+- All amounts are in **cents** (smallest currency unit)
+- User input in dollars/euros: multiply by 100 to get cents
+- Display: divide by 100 and format with `Intl.NumberFormat`
+- Maximum amount: 100 billion (100,000,000,000.00)
+- Use `parseAmountToCents()` from `~/lib/currency-utils` for parsing user input
+
+#### Exchange Rates
+- OpenExchangeRates API uses USD as base currency
+- Cache exchange rates for 1 hour (configurable in `~/server/config.ts`)
+- Always validate currency codes with `isValidCurrencyCode()` from `~/lib/validation`
+- Handle network errors gracefully with user-friendly messages
+
+#### Locale-Aware Formatting
+- Use `useFormatter()` from next-intl for number formatting
+- Respect user's locale for thousands/decimal separators
+- Support: en-US (1,000.00), cs-CZ (1 000,00), de-DE (1.000,00)
+- The `FormattedNumberInput` component handles locale-specific input parsing
+
+### 7. Testing Requirements
+
+#### Unit Tests (Vitest)
+- Place tests next to the file: `converter.ts` → `converter.test.ts`
+- Mock external dependencies (cache, fetch, config, logger)
+- Test success paths, error cases, edge cases (zero, large numbers, invalid input)
+- Use descriptive test names: `'should convert currency correctly'`
+- Follow Arrange-Act-Assert pattern
+- Aim for high coverage of business logic
+
+#### E2E Tests (Playwright)
+- Test critical user flows (conversion, currency swap, chart interaction)
+- Test responsive design (mobile and desktop viewports)
+- Test error states (network errors, validation errors)
+- Use `page.waitFor()` for dynamic content, avoid hardcoded timeouts
+- Take screenshots on failure (automatic with Playwright)
+
+#### Test Commands
+- `pnpm test-unit` - Run Vitest tests
+- `pnpm test-e2e` - Run Playwright tests
+- `pnpm test-start` - Run all tests sequentially
+
+### 8. Internationalization (i18n)
+
+#### Message Keys
+- All user-facing text must use i18n keys
+- Use `useTranslations()` hook: `const t = useTranslations()`
+- Keys are nested: `t('converter.errors.amountTooHigh')`
+- Update all 3 locale files: `messages/en.json`, `messages/cs.json`, `messages/de.json`
+
+#### Number/Currency Formatting
+- Use `useFormatter()` from next-intl for formatting
+- Currency formatting: `format.number(amount, { style: 'currency', currency: 'USD' })`
+- Numbers: `format.number(value, { maximumFractionDigits: 2 })`
+
+### 9. Configuration Management
+
+#### Environment Variables
+- All config in `~/server/config.ts` with Zod validation
+- Environment variables validated at startup (fail fast)
+- Use typed `config` object, never `process.env` directly in code
+- Required vars: `DATABASE_URL`, `OPENEXCHANGERATES_API_KEY`
+- Provide sensible defaults for optional vars
+
+#### Cache Configuration
+- Exchange rates: 1 hour TTL
+- Available currencies: 24 hours TTL
+- Timeseries data: 24 hours TTL
+- Use cache keys from `config.cache.keys` (centralized)
+
+### 10. Code Style
+
+#### Import Organization (ESLint)
+- Imports are auto-sorted by `eslint-plugin-simple-import-sort`
+- Order: external packages, then internal modules
+- Use `~/` path alias for absolute imports from `src/`
+- Run `pnpm lint-fix` to auto-fix import order
+
+#### Component Patterns
+```typescript
+'use client';
+
+import { useState } from 'react';
+
+import { Button } from '~/components/ui/button';
+import { trpc } from '~/utils/trpc-client';
+
+export function MyComponent() {
+  const [state, setState] = useState<string>('');
+  const mutation = trpc.conversion.add.useMutation();
+  
+  return <div>...</div>;
+}
+```
+
+#### Async/Await
+- Always use async/await, avoid raw Promises
+- Use try-catch for error handling
+- Return early on error conditions
+
+### 11. Performance Considerations
+
+#### Caching Strategy
+- Use filesystem cache (via `~/server/cache.ts`)
+- Cache external API calls aggressively
+- Statistics pre-calculated by triggers (O(1) reads)
+
+#### Database Queries
+- Use indexes (`@@index([targetCurrency])` in schema)
+- Select only needed fields, never `SELECT *`
+- Avoid N+1 queries - use `include` or `select` wisely
+
+#### Client-Side
+- Use Next.js Image component for images
+- Lazy load components when appropriate
+- Use React.memo() sparingly, only for expensive renders
+
+### 12. Security & Validation
+
+#### Input Validation
+- Validate all inputs with Zod schemas at tRPC boundaries
+- Server-side schemas in `~/lib/validation.ts`
+- Client-side form validation with react-hook-form + Zod
+- Never trust client input - always validate on server
+
+#### API Keys
+- Never expose API keys to client
+- Use server-side fetch only for external APIs
+- OpenExchangeRates key stays in `~/server/config.ts`
+
+### 13. Git & Development
+
+#### Commit Messages
+- Use conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`
+- Be descriptive: `feat: add locale-aware number formatting to amount input`
+
+#### Before Committing
+- Run `pnpm lint-fix` to auto-fix issues
+- Run `pnpm typecheck` to catch type errors
+- Run `pnpm test-unit` for unit tests
+- E2E tests run in CI (optional locally)
+
+#### Branch Protection
+- CI must pass (lint, E2E, unit tests) before merging
+- See `.github/workflows/main.yml` for CI pipeline
+
+### 14. Documentation
+
+#### Code Comments
+- Use JSDoc for functions, especially in `/server/services/`
+- Explain "why" not "what" - code should be self-explanatory
+- Document domain-specific logic (currency conversion formulas, etc.)
+
+#### README Updates
+- Keep README.md in sync with actual commands
+- Update environment variables section when adding new config
+- Document any breaking changes
+
+### 15. Common Patterns to Follow
+
+#### Currency Conversion Flow
+```typescript
+// 1. User inputs amount in dollars: "100.50"
+const userInput = "100.50";
+
+// 2. Parse to cents (server-side or client validation)
+const amountInCents = parseAmountToCents(userInput); // 10050
+
+// 3. Send to server
+const result = await trpc.conversion.add.mutate({
+  sourceAmount: amountInCents,
+  sourceCurrency: 'USD',
+  targetCurrency: 'EUR',
+});
+
+// 4. Store in DB as string
+await prisma.conversion.create({
+  data: {
+    sourceAmount: amountInCents.toString(), // "10050"
+    targetAmount: result.targetAmount.toString(),
+  }
+});
+
+// 5. Display to user
+format.number(result.targetAmount / 100, {
+  style: 'currency',
+  currency: 'EUR'
+}); // "€85.43"
+```
+
+#### Error Handling Pattern
+```typescript
+try {
+  const rates = await fetchExchangeRates();
+} catch (error) {
+  if (error instanceof Error && error.name === 'AbortError') {
+    throw new Error('Network error: Unable to connect to exchange rate service');
+  }
+  if (error instanceof TypeError && error.message.includes('fetch')) {
+    throw new Error('Network error: Unable to connect to exchange rate service');
+  }
+  throw error; // Re-throw other errors
+}
+```
+
+## Quick Reference Commands
+
+```bash
+pnpm dev              # Start dev server
+pnpm dx               # Migrate + seed + dev + Prisma Studio
+pnpm build            # Build for production
+pnpm lint-fix         # Auto-fix linting issues
+pnpm typecheck        # Check TypeScript types
+pnpm test-unit        # Run Vitest tests
+pnpm test-e2e         # Run Playwright tests
+pnpm migrate-dev      # Create database migration
+pnpm db-seed          # Seed database
+pnpm prisma-studio    # Open database GUI
+```
+
+## AI Assistant Instructions
+
+When helping with this codebase:
+1. Always maintain type safety - never suggest `any` types
+2. Follow the established patterns (tRPC procedures, Prisma queries)
+3. Keep server and client code separate
+4. Write tests for new features (unit tests required, E2E tests for UI)
+5. Update all 3 locale files for any new user-facing text
+6. Respect the amount handling pattern (cents in logic, strings in DB)
+7. Use centralized config instead of hardcoded values
+8. Follow the commit message convention
+9. Check that imports are properly sorted (run lint-fix)
+10. Verify TypeScript and tests pass before considering code complete
+
