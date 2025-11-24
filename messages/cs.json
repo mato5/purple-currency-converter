@@ -50,6 +50,7 @@
       "invalidAmount": "Zadejte prosím částku",
       "invalidNumber": "Zadejte prosím platné číslo",
       "amountTooLow": "Částka musí být větší než nula",
+      "amountTooHigh": "Částka je příliš vysoká. Maximum je 100 miliard",
       "invalidCurrencyCode": "Neplatný kód měny",
       "sameCurrency": "Zdrojová a cílová měna musí být odlišné"
     },

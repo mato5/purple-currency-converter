@@ -1,16 +1,19 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { 
-  httpBatchStreamLink, 
+import {
+  httpBatchStreamLink,
   httpSubscriptionLink,
+  loggerLink,
   splitLink,
-  loggerLink 
 } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
-import { useState } from 'react';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
+import { useState } from 'react';
+
+import { clientConfig } from '~/lib/config';
 import type { AppRouter } from '~/server/routers/_app';
+
 import { transformer } from './transformer';
 
 export const trpc = createTRPCReact<AppRouter>();
@@ -81,25 +84,22 @@ export function TRPCProvider({
             transformer,
             // Add timeout and better error handling
             async fetch(url, options) {
-              // Create an AbortController with a 5-second timeout
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 5000);
-              
               try {
                 const response = await fetch(url, {
                   ...options,
-                  signal: controller.signal,
+                  signal: AbortSignal.timeout(clientConfig.trpcTimeout),
                 });
-                clearTimeout(timeoutId);
                 return response;
               } catch (error) {
-                clearTimeout(timeoutId);
                 // Convert all network errors to a consistent error type
                 if (error instanceof Error) {
                   if (error.name === 'AbortError') {
                     throw new TypeError('Network error: Request timeout');
                   }
-                  if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                  if (
+                    error.message.includes('Failed to fetch') ||
+                    error.message.includes('NetworkError')
+                  ) {
                     throw new TypeError('Network error: Unable to connect');
                   }
                 }

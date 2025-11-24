@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react"
-import { useTranslations } from "next-intl"
 import { ChevronDown } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { useEffect, useLayoutEffect,useRef, useState } from "react"
+
 import { getCurrencySymbol } from "~/lib/currency-utils"
 import type { Currency } from "~/server/services/converter"
 

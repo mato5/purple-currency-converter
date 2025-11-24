@@ -2,31 +2,17 @@
  * Get historical exchange rate timeseries procedure
  * Returns empty array if data is not available for the currency pair
  */
-import { publicProcedure } from '~/server/trpc';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
-import {
-  getTimeseriesData,
-  isValidCurrencyCode,
-} from '~/server/services/converter';
+
+import { timeseriesInputSchema } from '~/lib/validation';
 import { createLogger } from '~/server/logger';
+import { getTimeseriesData } from '~/server/services/converter';
+import { publicProcedure } from '~/server/trpc';
 
 const logger = createLogger({ module: 'get-timeseries-procedure' });
 
 export const getTimeseriesProcedure = publicProcedure
-  .input(
-    z.object({
-      sourceCurrency: z
-        .string()
-        .toUpperCase()
-        .refine(isValidCurrencyCode, 'Invalid source currency code'),
-      targetCurrency: z
-        .string()
-        .toUpperCase()
-        .refine(isValidCurrencyCode, 'Invalid target currency code'),
-      days: z.number().int().min(1).max(365).default(30),
-    }),
-  )
+  .input(timeseriesInputSchema)
   .query(async ({ input }) => {
     logger.debug(
       {

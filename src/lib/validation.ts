@@ -1,30 +1,34 @@
-import { z } from 'zod';
 import currencyCodes from 'currency-codes';
+import { z } from 'zod';
 
 /**
  * Validate currency code using currency-codes library
  */
-function isValidCurrencyCode(code: string): boolean {
+export function isValidCurrencyCode(code: string): boolean {
   return currencyCodes.code(code) !== undefined;
 }
 
 /**
+ * Maximum amount in standard units (for display)
+ */
+export const MAX_AMOUNT_DISPLAY = 100_000_000_000;
+
+/**
+ * Maximum amount in cents (smallest currency unit)
+ */
+export const MAX_AMOUNT_CENTS = MAX_AMOUNT_DISPLAY * 100;
+
+/**
  * Create form validation schema with i18n error messages
  * Pass t function from useTranslations for localized messages
+ * Coerces string input to number for validation
  */
 export function createConversionFormSchema(t: (key: string) => string) {
   return z.object({
-    amount: z
-      .string()
-      .min(1, t('converter.errors.invalidAmount'))
-      .refine(
-        (val) => !isNaN(Number(val.replace(',', '.'))),
-        t('converter.errors.invalidNumber'),
-      )
-      .refine(
-        (val) => Number(val.replace(',', '.')) > 0,
-        t('converter.errors.amountTooLow'),
-      ),
+    amount: z.coerce
+      .number({ invalid_type_error: t('converter.errors.invalidAmount') })
+      .positive(t('converter.errors.amountTooLow'))
+      .max(MAX_AMOUNT_DISPLAY, t('converter.errors.amountTooHigh')),
     sourceCurrency: z
       .string()
       .length(3, t('converter.errors.invalidCurrencyCode'))
@@ -38,29 +42,50 @@ export function createConversionFormSchema(t: (key: string) => string) {
   });
 }
 
-// Default schema without translations (for server-side use)
-export const conversionFormSchema = z.object({
-  amount: z
-    .string()
-    .min(1, 'Please enter an amount')
-    .refine(
-      (val) => !isNaN(Number(val.replace(',', '.'))),
-      'Please enter a valid number',
-    )
-    .refine(
-      (val) => Number(val.replace(',', '.')) > 0,
-      'Amount must be greater than zero',
+/**
+ * Server-side conversion schema
+ * Validates conversion requests with amount in cents
+ */
+export const conversionInputSchema = z.object({
+  sourceAmount: z
+    .number()
+    .int('Amount must be an integer (cents)')
+    .positive('Amount must be positive')
+    .max(
+      MAX_AMOUNT_CENTS,
+      `Amount too large. Maximum is $${MAX_AMOUNT_DISPLAY.toLocaleString()}`,
     ),
   sourceCurrency: z
     .string()
     .length(3, 'Currency code must be 3 characters')
     .toUpperCase()
-    .refine(isValidCurrencyCode, 'Invalid currency code'),
+    .refine(isValidCurrencyCode, 'Invalid source currency code'),
   targetCurrency: z
     .string()
     .length(3, 'Currency code must be 3 characters')
     .toUpperCase()
-    .refine(isValidCurrencyCode, 'Invalid currency code'),
+    .refine(isValidCurrencyCode, 'Invalid target currency code'),
 });
 
-export type ConversionFormInput = z.infer<typeof conversionFormSchema>;
+/**
+ * Timeseries request schema
+ * Validates historical exchange rate data requests
+ */
+export const timeseriesInputSchema = z.object({
+  sourceCurrency: z
+    .string()
+    .toUpperCase()
+    .refine(isValidCurrencyCode, 'Invalid source currency code'),
+  targetCurrency: z
+    .string()
+    .toUpperCase()
+    .refine(isValidCurrencyCode, 'Invalid target currency code'),
+  days: z.number().int().min(1).max(365).default(30),
+});
+
+// Type exports
+export type ConversionInput = z.infer<typeof conversionInputSchema>;
+export type TimeseriesInput = z.infer<typeof timeseriesInputSchema>;
+export type ConversionFormInput = z.infer<
+  ReturnType<typeof createConversionFormSchema>
+>;

@@ -1,12 +1,13 @@
 'use client';
 
-import { NextIntlClientProvider } from 'next-intl';
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
-import { TRPCProvider } from '~/utils/trpc-client';
-import { getUserLocale } from '~/lib/intl';
-import { clientConfig } from '~/lib/config';
-import { SUPPORTED_LOCALES, DEFAULT_LOCALE, type SupportedLocale } from '~/lib/locales';
 import type { Messages } from 'next-intl';
+import { NextIntlClientProvider } from 'next-intl';
+import { createContext, useCallback, useContext,useEffect, useState } from 'react';
+
+import { clientConfig } from '~/lib/config';
+import { getUserLocale } from '~/lib/intl';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type SupportedLocale } from '~/lib/locales';
+import { TRPCProvider } from '~/utils/trpc-client';
 
 // Locale context for managing user's preferred locale
 interface LocaleContextType {

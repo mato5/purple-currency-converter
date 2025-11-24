@@ -24,6 +24,13 @@ const configSchema = z.object({
 
   // Cache configuration
   cache: z.object({
+    // Cache keys
+    keys: z.object({
+      exchangeRates: z.string().default('exchange_rates'),
+      availableCurrencies: z.string().default('available_currencies'),
+      timeseriesPrefix: z.string().default('timeseries'),
+    }),
+    // TTL values
     exchangeRatesTtl: z
       .number()
       .positive()
@@ -37,6 +44,9 @@ const configSchema = z.object({
       .positive()
       .default(24 * 60 * 60 * 1000), // 24 hours
   }),
+
+  // API timeout configuration (in milliseconds)
+  apiTimeout: z.number().positive().default(10000), // 10 seconds
 
   // Client configuration
   client: z.object({
@@ -66,6 +76,11 @@ export function loadConfig(): Config {
     openExchangeRatesBaseUrl: process.env.OPEN_EXCHANGE_RATES_BASE_URL,
     ecbBaseUrl: process.env.ECB_BASE_URL,
     cache: {
+      keys: {
+        exchangeRates: process.env.CACHE_KEY_EXCHANGE_RATES,
+        availableCurrencies: process.env.CACHE_KEY_AVAILABLE_CURRENCIES,
+        timeseriesPrefix: process.env.CACHE_KEY_TIMESERIES_PREFIX,
+      },
       exchangeRatesTtl: process.env.CACHE_EXCHANGE_RATES_TTL
         ? parseInt(process.env.CACHE_EXCHANGE_RATES_TTL, 10)
         : undefined,
@@ -76,6 +91,9 @@ export function loadConfig(): Config {
         ? parseInt(process.env.CACHE_TIMESERIES_TTL, 10)
         : undefined,
     },
+    apiTimeout: process.env.API_TIMEOUT
+      ? parseInt(process.env.API_TIMEOUT, 10)
+      : undefined,
     client: {
       debounceDelay: process.env.NEXT_PUBLIC_DEBOUNCE_DELAY
         ? parseInt(process.env.NEXT_PUBLIC_DEBOUNCE_DELAY, 10)

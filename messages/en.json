@@ -50,6 +50,7 @@
       "invalidAmount": "Please enter an amount",
       "invalidNumber": "Please enter a valid number",
       "amountTooLow": "Amount must be greater than zero",
+      "amountTooHigh": "Amount is too large. Maximum is 100 billion",
       "invalidCurrencyCode": "Invalid currency code",
       "sameCurrency": "Source and target currencies must be different"
     },

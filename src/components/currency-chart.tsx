@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { useTranslations, useFormatter } from "next-intl"
-import { Card } from "~/components/ui/card"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
-import { trpc } from "~/utils/trpc-client"
 import { Loader2 } from "lucide-react"
+import { useFormatter,useTranslations } from "next-intl"
+import { useState } from "react"
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer,Tooltip, XAxis, YAxis } from "recharts"
+
+import { Card } from "~/components/ui/card"
+import { trpc } from "~/utils/trpc-client"
 
 interface CurrencyChartProps {
   fromCurrency: string

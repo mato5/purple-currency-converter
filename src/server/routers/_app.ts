@@ -1,11 +1,12 @@
 /**
  * This file contains the root router of your tRPC-backend
  */
+import { config } from '~/server/config';
+import { createLogger } from '~/server/logger';
 import { createCallerFactory, publicProcedure, router } from '~/server/trpc';
+
 import { conversionRouter } from './conversion/router';
 import { statisticsRouter } from './statistics/router';
-import { createLogger } from '~/server/logger';
-import { config } from '~/server/config';
 
 const logger = createLogger({ module: 'app-router' });
 

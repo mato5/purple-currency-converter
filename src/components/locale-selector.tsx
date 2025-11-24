@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import { useTranslations } from "next-intl"
 import { ChevronDown, Globe } from "lucide-react"
+import { useTranslations } from "next-intl"
+import { useEffect,useRef, useState } from "react"
+
 import { SUPPORTED_LOCALES, type SupportedLocale } from "~/lib/locales"
 
 interface LocaleSelectorProps {
@@ -10,7 +11,7 @@ interface LocaleSelectorProps {
   onLocaleChange: (locale: SupportedLocale) => void
 }
 
-const locales: Array<{ code: SupportedLocale; flag: string }> = [
+const locales: { code: SupportedLocale; flag: string }[] = [
   { code: 'en', flag: '🇬🇧' },
   { code: 'cs', flag: '🇨🇿' },
   { code: 'de', flag: '🇩🇪' },

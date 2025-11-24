@@ -1,6 +1,7 @@
 import tseslint from 'typescript-eslint';
 import reactPlugin from 'eslint-plugin-react';
 import * as reactHooks from 'eslint-plugin-react-hooks';
+import simpleImportSort from 'eslint-plugin-simple-import-sort';
 
 export default tseslint.config(
   reactHooks.configs.recommended,
@@ -8,6 +9,7 @@ export default tseslint.config(
     files: ['**/*.js', '**/*.ts', '**/*.tsx'],
     plugins: {
       react: reactPlugin,
+      'simple-import-sort': simpleImportSort,
     },
     extends: [
       ...tseslint.configs.recommended,
@@ -17,6 +19,10 @@ export default tseslint.config(
     rules: {
       ...reactPlugin.configs['jsx-runtime'].rules,
       'react-hooks/react-compiler': 'error',
+
+      // Import sorting
+      'simple-import-sort/imports': 'error',
+      'simple-import-sort/exports': 'error',
 
       // Place to specify ESLint rules. Can be used to overwrite rules specified from the extended configs
       '@typescript-eslint/consistent-type-definitions': 'off',

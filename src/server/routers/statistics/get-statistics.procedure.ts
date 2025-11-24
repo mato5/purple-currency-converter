@@ -2,9 +2,11 @@
  * Get current statistics procedure
  * This is very fast as statistics are calculated on-demand with indexed queries
  */
-import { publicProcedure } from '~/server/trpc';
 import { TRPCError } from '@trpc/server';
+
 import { createLogger } from '~/server/logger';
+import { publicProcedure } from '~/server/trpc';
+
 import { fetchStatistics } from './fetch-statistics';
 
 const logger = createLogger({ module: 'get-statistics-procedure' });

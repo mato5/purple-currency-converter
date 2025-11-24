@@ -1,7 +1,8 @@
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
-import { appRouter } from '~/server/routers/_app';
+
 import { createContext } from '~/server/context';
 import { createLogger } from '~/server/logger';
+import { appRouter } from '~/server/routers/_app';
 
 const logger = createLogger({ module: 'trpc-handler' });
 

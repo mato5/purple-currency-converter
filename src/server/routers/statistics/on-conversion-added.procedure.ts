@@ -1,5 +1,6 @@
-import { publicProcedure } from '~/server/trpc';
 import { createLogger } from '~/server/logger';
+import { publicProcedure } from '~/server/trpc';
+
 import { fetchStatistics } from './fetch-statistics';
 
 const logger = createLogger({ module: 'on-update-procedure' });

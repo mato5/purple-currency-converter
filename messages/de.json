@@ -50,6 +50,7 @@
       "invalidAmount": "Bitte geben Sie einen Betrag ein",
       "invalidNumber": "Bitte geben Sie eine gültige Zahl ein",
       "amountTooLow": "Der Betrag muss größer als Null sein",
+      "amountTooHigh": "Der Betrag ist zu hoch. Maximum ist 100 Milliarden",
       "invalidCurrencyCode": "Ungültiger Währungscode",
       "sameCurrency": "Quell- und Zielwährung müssen unterschiedlich sein"
     },

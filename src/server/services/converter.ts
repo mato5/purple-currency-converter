@@ -1,7 +1,7 @@
+import { isValidCurrencyCode } from '~/lib/validation';
+import { cache } from '~/server/cache';
 import { config } from '~/server/config';
 import { createLogger } from '~/server/logger';
-import { cache } from '~/server/cache';
-import currencyCodes from 'currency-codes';
 
 const logger = createLogger({ module: 'converter' });
 
@@ -16,18 +16,11 @@ export interface TimeseriesDataPoint {
 }
 
 /**
- * Validate currency code using currency-codes library
- */
-export function isValidCurrencyCode(code: string): boolean {
-  return currencyCodes.code(code) !== undefined;
-}
-
-/**
  * Fetch exchange rates from OpenExchangeRates API
  * Uses filesystem cache to minimize API calls
  */
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
-  const cacheKey = 'exchange_rates';
+  const cacheKey = config.cache.keys.exchangeRates;
 
   // Try to get from cache
   const cached = await cache.get<Record<string, number>>(cacheKey);
@@ -40,15 +33,10 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
 
   try {
     const url = `${config.openExchangeRatesBaseUrl}/latest.json?app_id=${config.openExchangeRatesApiKey}`;
-    // Add 10 second timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(url, { signal: controller.signal }).finally(
-      () => {
-        clearTimeout(timeoutId);
-      },
-    );
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(config.apiTimeout),
+    });
 
     if (!response.ok) {
       const error = await response.text();
@@ -143,16 +131,10 @@ export async function convertCurrency(
 
   // OpenExchangeRates uses USD as base currency
   // Convert: sourceAmount (in cents) -> USD -> targetAmount (in cents)
-  // Note: Using floating-point arithmetic is standard for currency conversion.
-  // Precision is maintained by:
-  // 1. Working in cents (smallest unit)
-  // 2. Rounding only at the final step
-  // 3. Using exchange rates with sufficient decimal places
   const amountInUSD = sourceAmount / rates[sourceCurrency];
   const targetAmount = amountInUSD * rates[targetCurrency];
 
   // Round to nearest cent using standard rounding (rounds 0.5 up)
-  // This is the industry-standard approach for currency conversion
   const roundedTargetAmount = Math.round(targetAmount);
 
   logger.debug(
@@ -161,7 +143,6 @@ export async function convertCurrency(
       targetAmount: roundedTargetAmount,
       sourceCurrency,
       targetCurrency,
-      precision: targetAmount - roundedTargetAmount, // Log precision difference
     },
     'Currency converted successfully',
   );
@@ -179,7 +160,7 @@ export async function convertCurrency(
  * Uses filesystem cache with 24-hour TTL
  */
 export async function getAvailableCurrencies(): Promise<Currency[]> {
-  const cacheKey = 'available_currencies';
+  const cacheKey = config.cache.keys.availableCurrencies;
 
   // Try to get from cache
   const cached = await cache.get<Currency[]>(cacheKey);
@@ -192,15 +173,10 @@ export async function getAvailableCurrencies(): Promise<Currency[]> {
 
   try {
     const url = `${config.openExchangeRatesBaseUrl}/currencies.json?app_id=${config.openExchangeRatesApiKey}`;
-    // Add 10 second timeout to prevent hanging
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(url, { signal: controller.signal }).finally(
-      () => {
-        clearTimeout(timeoutId);
-      },
-    );
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(config.apiTimeout),
+    });
 
     if (!response.ok) {
       const error = await response.text();
@@ -255,7 +231,7 @@ async function fetchECBTimeseries(
   currency: string,
   year: number,
 ): Promise<Record<string, number>> {
-  const cacheKey = `timeseries_${year}_${currency}`;
+  const cacheKey = `${config.cache.keys.timeseriesPrefix}_${year}_${currency}`;
 
   // Try to get from cache
   const cached = await cache.get<Record<string, number>>(cacheKey);
@@ -290,15 +266,9 @@ async function fetchECBTimeseries(
   const endPeriod = `${year}-12-31`;
   const url = `${config.ecbBaseUrl}/D.${currency}.EUR.SP00.A?startPeriod=${startPeriod}&endPeriod=${endPeriod}&format=csvdata`;
 
-  // Add 10 second timeout to prevent hanging
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  const response = await fetch(url, { signal: controller.signal }).finally(
-    () => {
-      clearTimeout(timeoutId);
-    },
-  );
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(config.apiTimeout),
+  });
 
   if (!response.ok) {
     logger.warn(

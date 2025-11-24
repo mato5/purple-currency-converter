@@ -4,14 +4,19 @@
  */
 
 /**
- * Parse amount string to cents (smallest currency unit)
+ * Parse amount to cents (smallest currency unit)
  * Handles various locales by normalizing comma/period separators
  *
- * @param amount - String representation of amount (e.g., "100.50" or "100,50")
- * @returns Amount in cents (e.g., 10050)
+ * @param amount - String or number representation of amount
+ * @returns Amount in cents as number
  */
-export function parseAmountToCents(amount: string): number {
-  // Normalize separators: replace comma with period, remove non-numeric characters except period
+export function parseAmountToCents(amount: string | number): number {
+  // If already a number, just convert to cents
+  if (typeof amount === 'number') {
+    return Math.round(amount * 100);
+  }
+
+  // If string, normalize separators: replace comma with period, remove non-numeric characters except period
   const normalized = amount.replace(/,/g, '.').replace(/[^\d.]/g, '');
   const parsed = Number(normalized);
 

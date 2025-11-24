@@ -1,14 +1,13 @@
-import { publicProcedure } from '~/server/trpc';
 import type { Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
-import { prisma } from '~/server/prisma';
-import {
-  convertCurrency,
-  isValidCurrencyCode,
-} from '~/server/services/converter';
+
+import { conversionInputSchema } from '~/lib/validation';
 import { createLogger } from '~/server/logger';
+import { prisma } from '~/server/prisma';
+import { convertCurrency } from '~/server/services/converter';
+import { publicProcedure } from '~/server/trpc';
 import { toTRPCError } from '~/server/utils/error-handler';
+
 import { fetchStatistics } from '../statistics/fetch-statistics';
 
 const logger = createLogger({ module: 'add-conversion-procedure' });
@@ -27,19 +26,7 @@ const defaultConversionSelect = {
  * Creates a new currency conversion and returns the result with updated statistics
  */
 export const addConversionProcedure = publicProcedure
-  .input(
-    z.object({
-      sourceAmount: z.number().int().positive(),
-      sourceCurrency: z
-        .string()
-        .toUpperCase()
-        .refine(isValidCurrencyCode, 'Invalid source currency code'),
-      targetCurrency: z
-        .string()
-        .toUpperCase()
-        .refine(isValidCurrencyCode, 'Invalid target currency code'),
-    }),
-  )
+  .input(conversionInputSchema)
   .mutation(async ({ input }) => {
     try {
       if (input.sourceCurrency === input.targetCurrency) {

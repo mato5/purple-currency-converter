@@ -1,6 +1,6 @@
 import {
-  SUPPORTED_LOCALES,
   DEFAULT_LOCALE,
+  SUPPORTED_LOCALES,
   type SupportedLocale,
 } from './locales';
 

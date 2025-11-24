@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.setTimeout(35e3);
 
@@ -280,5 +280,97 @@ test.describe('Currency Converter', () => {
     const amountBox = await amountInput.boundingBox();
 
     expect(amountBox).not.toBeNull();
+  });
+
+  test('handles maximum amount conversion (100 billion KWD to LBP)', async ({
+    page,
+  }) => {
+    await page.goto('/');
+
+    // Wait for page to load
+    const amountInput = page.locator('input[name="amount"]').last();
+    await amountInput.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Select KWD (Kuwaiti Dinar - strongest currency) as source
+    const fromCurrencyButton = page
+      .locator('button')
+      .filter({ hasText: 'EUR' })
+      .first();
+    await fromCurrencyButton.click();
+    await page.waitForTimeout(500);
+
+    // Search for KWD
+    const searchInput = page.locator('input[type="text"]').nth(1);
+    await searchInput.fill('KWD');
+    await page.waitForTimeout(500);
+
+    // Select KWD
+    const kwdOption = page.locator('text=KWD').first();
+    await kwdOption.click();
+    await page.waitForTimeout(500);
+
+    // Select LBP (Lebanese Pound - weakest currency) as target
+    const toCurrencyButton = page
+      .locator('button')
+      .filter({ hasText: 'CZK' })
+      .first();
+    await toCurrencyButton.click();
+    await page.waitForTimeout(500);
+
+    // Search for LBP
+    const searchInput2 = page.locator('input[type="text"]').nth(1);
+    await searchInput2.fill('LBP');
+    await page.waitForTimeout(500);
+
+    // Select LBP
+    const lbpOption = page.locator('text=LBP').first();
+    await lbpOption.click();
+    await page.waitForTimeout(500);
+
+    // Enter maximum amount (100 billion)
+    await amountInput.clear();
+    await amountInput.fill('100000000000');
+
+    // Click convert button
+    const convertButton = page.getByRole('button', {
+      name: /convert currency/i,
+    });
+    await convertButton.click();
+
+    // Wait for conversion to complete (longer timeout for large amounts)
+    await page.waitForTimeout(5000);
+
+    // Check that result is visible (not an error)
+    const resultCard = page
+      .locator('[class*="bg-white"]')
+      .filter({ hasText: /LBP/ });
+    await expect(resultCard.first()).toBeVisible({ timeout: 10000 });
+
+    // Ensure no error message is shown
+    const errorMessage = page.locator('text=/conversion failed/i');
+    await expect(errorMessage).not.toBeVisible();
+  });
+
+  test('rejects amounts above maximum (over 100 billion)', async ({ page }) => {
+    await page.goto('/');
+
+    const amountInput = page.locator('input[name="amount"]').last();
+    await amountInput.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Enter amount above maximum (100 billion + 1)
+    await amountInput.clear();
+    await amountInput.fill('100000000001');
+
+    // Blur the input to trigger validation
+    await amountInput.blur();
+    await page.waitForTimeout(500);
+
+    // Check that convert button is disabled due to validation error
+    const convertButton = page.getByRole('button', {
+      name: /convert currency/i,
+    });
+
+    // Button should be disabled
+    await expect(convertButton).toBeDisabled({ timeout: 2000 });
   });
 });
